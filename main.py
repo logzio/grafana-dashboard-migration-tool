@@ -2,18 +2,14 @@ import json
 import requests
 import logging
 import os
+import input_validator
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s : %(message)s', level=logging.INFO)
+
 GRAFANA_HOST = os.environ['GRAFANA_HOST']
 GRAFANA_TOKEN = os.environ['GRAFANA_TOKEN']
 LOGZIO_API_TOKEN = os.environ['LOGZIO_API_TOKEN']
-BASE_API_URL = 'https://api.logz.io/v1/grafana/api/'  # sys.argv[3]
-
-
-BASE_URL = 'http://{}/api'.format(GRAFANA_HOST)
-UPLOAD_DASHBOARD_URL = '{}dashboards/db'.format(BASE_API_URL)
-ALL_DASHBOARDS_URL = '{}/search'.format(BASE_URL)
-ALERTS = []
+REGION_CODE = os.environ['REGION_CODE']
 
 REQUEST_HEADERS = {
     'Authorization': 'Bearer {}'.format(GRAFANA_TOKEN),
@@ -29,10 +25,53 @@ LOGZIO_API_HEADERS = {
     'User-Agent': None
 }
 
+ALERTS = []
 
 SUPPORTED_PANELS = ['graph', 'grafana-worldmap-panel', 'grafana-piechart-panel', 'singlestat', 'dashlist',
                     'alertlist', 'text', 'heatmap', 'bargauge', 'table', 'gauge', 'stat', 'row']
 
+# validate inputs
+input_validator.is_valid_grafana_host(GRAFANA_HOST)
+input_validator.is_valid_grafana_api_token(GRAFANA_TOKEN)
+input_validator.is_valid_logzio_api(LOGZIO_API_TOKEN)
+BASE_API_URL = input_validator.is_valid_region_code(REGION_CODE)
+
+BASE_URL = 'http://{}/api'.format(GRAFANA_HOST)
+UPLOAD_DASHBOARD_URL = '{}dashboards/db'.format(BASE_API_URL)
+ALL_DASHBOARDS_URL = '{}/search'.format(BASE_URL)
+
+
+# set dashboard values before upload and creating new dashboard with grafana api
+def _init_parameters(dashboard, fid):
+    try:
+        dashboard['overwrite'] = True
+        dashboard['folderId'] = fid
+        dashboard['dashboard']['id'] = None
+        dashboard['dashboard']['editable'] = True
+        dashboard['dashboard']['uid'] = None
+        dashboard['dashboard']['refresh'] = "30s"
+    except KeyError as e:
+        logging.error(
+            'At `{}` dashboard, error occurred while setting dashboard parameters'.format(dashboard['dashboard'],
+                                                                                          ['title']))
+
+
+# Get all dashboards as json from grafana host
+def _init_dashboard_list(uid_list, base_url, r_headers):
+    dashboards_list = []
+    for uid in uid_list:
+        request_url = '{}/dashboards/uid/{}'.format(base_url, uid)
+        response = requests.get(request_url, headers=r_headers)
+        dashboard = response.json()
+        try:
+            del dashboard['meta']
+        except KeyError:
+            logging.error('At {}')
+        dashboards_list.append(dashboard)
+    return dashboards_list
+
+
+# Creates new folder for uploaded dashboards, if the folder already exists, the dashboards in the folder wil be overwriten
 def _create_uploaded_folder():
     folder_url = '{}folders'.format(BASE_API_URL)
     folder_id = None
@@ -54,6 +93,7 @@ def _create_uploaded_folder():
     return folder_id
 
 
+# Adding panel types to dedicated list
 def _get_panel_types(panels, panel_types):
     for panel in panels:
         try:
@@ -62,8 +102,8 @@ def _get_panel_types(panels, panel_types):
             logging.error(e)
 
 
+# check for unsupported panel types
 def _inspect_panels_types(dashboard):
-    # check for unsupported panel types
     panel_types = []
     _get_panel_types(dashboard['dashboard']['panels'], panel_types)
     panel_types = list(dict.fromkeys(panel_types))
@@ -81,11 +121,12 @@ def _update_panels_datesources(dashboard, ds_name, var_list):
                                                                                           'remote_env)'})
         for panel in dashboard['dashboard']['panels']:
             panel['datasource'] = '${}'.format(ds_name)
-            _add_enviroment_label(panel, var_list)
+            _add_enviroment_label(panel, dashboard['dashboard']['title'])
     except KeyError as e:
         logging.error('KeyError: {}'.format(e))
 
 
+# Recursive function to generate query with the `remote_env` label
 def _generate_query(query_string, env_filter_string):
     if '{' not in query_string:
         return query_string
@@ -94,8 +135,8 @@ def _generate_query(query_string, env_filter_string):
     query_string = query_string[idx:]
     return new_query + _generate_query(query_string, env_filter_string)
 
-
-def _add_enviroment_label(panel, var_list):
+# Adding `remote_env` label to all query strings in the dashboard
+def _add_enviroment_label(panel, title):
     env_filter_string = 'remote_env="$remote_env",'
     try:
         q_idx = 0
@@ -106,10 +147,14 @@ def _add_enviroment_label(panel, var_list):
                     new_query = _generate_query(query_string, env_filter_string)
                     panel['targets'][q_idx]['expr'] = new_query
                     q_idx += 1
+                else:
+                    ALERTS.append(
+                        'At `{}` dashboard: failed to add `remote_env` to filtering in panel: {}'.format(title, panel[
+                            'title']))
     except KeyError as e:
         logging.error('at _add_enviroment_label: {}'.format(e))
 
-
+# Checking panels for Static datasource reference, will create dynamic datasource variable if not exists
 def _validate_templating(dashboard):
     try:
         var_list = dashboard['dashboard']['templating']['list']
@@ -126,34 +171,12 @@ def _validate_templating(dashboard):
             }
             datasource_name = new_ds['name']
             var_list.append(new_ds)
+
         dashboard['dashboard']['templating']['list'] = var_list
         _update_panels_datesources(dashboard, datasource_name, var_list)
     except KeyError as e:
-        logging.info('An error has occurred while editing the dashboards: {}'.format(e))
-
-
-def _init_parameters(dashboard, fid):
-    # set dashboard values before upload and creating new dashboard with grafana api
-    dashboard['overwrite'] = True
-    dashboard['folderId'] = fid
-    dashboard['dashboard']['id'] = None
-    dashboard['dashboard']['editable'] = True
-    dashboard['dashboard']['uid'] = None
-    dashboard['dashboard']['refresh'] = "30s"
-
-
-def _init_dashboard_list(uid_list, base_url, r_headers):
-    dashboards_list = []
-    for uid in uid_list:
-        request_url = '{}/dashboards/uid/{}'.format(base_url, uid)
-        response = requests.get(request_url, headers=r_headers)
-        dashboard = response.json()
-        try:
-            del dashboard['meta']
-        except KeyError:
-            pass
-        dashboards_list.append(dashboard)
-    return dashboards_list
+        logging.info('At `{}` dashboard - an error has occurred while editing the dashboard: {}'.format(
+            dashboard['dashboard']['title'], e))
 
 
 # main script
@@ -161,27 +184,41 @@ def main():
     all_dashboards = requests.get(ALL_DASHBOARDS_URL, headers=REQUEST_HEADERS).json()
     uids = []
     for item in all_dashboards:
-        uids.append(item['uid'])
+        try:
+            uids.append(item['uid'])
+        except TypeError as e:
+            raise TypeError(all_dashboards['message'])
     # init list
     dashboards_list = _init_dashboard_list(uids, BASE_URL, REQUEST_HEADERS)
     # create new folder to store the dashboards
     folder_id = _create_uploaded_folder()
+
     for dashboard in dashboards_list:
-        _init_parameters(dashboard, folder_id)
-        _validate_templating(dashboard)
-        # _inspect_panels_types(dashboard)
-        try:
-            upload_response = requests.post(url=UPLOAD_DASHBOARD_URL, data=json.dumps(dashboard), params={},
-                                            headers=LOGZIO_API_HEADERS)
-        except Exception as e:
-            logging.error("{} dashboard error : {}".format(dashboard['dashboard']['title'], e))
-        if upload_response.status_code == 200:
-            logging.info("`{}` dashboard uploaded successfully, schema version: {}, status code: {}".format(
-                dashboard['dashboard']['title'], dashboard['dashboard']['schemaVersion'], upload_response.status_code))
+        if "rows" not in dashboard['dashboard'].keys() or dashboard['dashboard']['schemaVersion'] > 14:
+            _init_parameters(dashboard, folder_id)
+            _validate_templating(dashboard)
+            _inspect_panels_types(dashboard)
+            try:
+                upload_response = requests.post(url=UPLOAD_DASHBOARD_URL, data=json.dumps(dashboard), params={},
+                                                headers=LOGZIO_API_HEADERS)
+            except Exception as e:
+                logging.error("At `{}` dashboard - upload error : {}".format(dashboard['dashboard']['title'], e))
+            if upload_response.status_code == 200:
+                logging.info("`{}` dashboard uploaded successfully, schema version: {}, status code: {}".format(
+                    dashboard['dashboard']['title'], dashboard['dashboard']['schemaVersion'],
+                    upload_response.status_code))
+            else:
+                logging.error(
+                    'At `{}` dashboard - upload error: {} - schema version: {}'.format(dashboard['dashboard']['title'],
+                                                                                       upload_response.text,
+                                                                                       dashboard['dashboard'][
+                                                                                           'schemaVersion']))
         else:
-            logging.error('`{}` - {} - schema version: {}'.format(dashboard['dashboard']['title'], upload_response.text,
-                                                                  dashboard['dashboard']['schemaVersion']))
-    for alert in ALERTS:
+            ALERTS.append(
+                'At `{}` dashboard: cannot parse "rows" object, please consider to update the dashboard schema '
+                'version, current version: {}'.format(dashboard['dashboard']['title'], dashboard[
+                    'dashboard']['schemaVersion']))
+    for alert in sorted(ALERTS):
         logging.warning(alert)
 
 
