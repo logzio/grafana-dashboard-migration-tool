@@ -1,7 +1,9 @@
+import os
+import configuration
+os.system('pip install -r requirements.txt')
 import json
 import requests
 import logging
-import os
 import input_validator
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s : %(message)s', level=logging.INFO)
