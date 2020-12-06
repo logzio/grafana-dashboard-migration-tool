@@ -1,4 +1,4 @@
-# Grfana dashboard migration tool
+# Grafana dashboard migration tool
 A simple tool to migrate your grafana dashboards to Logz.io platform with minimal effort. Based on Python 3.7
 
 ### Dependencies:
