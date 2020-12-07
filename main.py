@@ -120,8 +120,8 @@ def _inspect_panels_types(dashboard):
 def _update_panels_datesources(dashboard, ds_name, var_list):
     try:
         var_list.append(
-            {'name': 'remote_env', 'datasource': '$datasource', 'type': 'query', 'query': 'label_values('
-                                                                                          'remote_env)'})
+            {'name': 'p8s_logzio_name', 'datasource': '$datasource', 'type': 'query', 'query': 'label_values('
+                                                                                          'p8s_logzio_name)'})
         for panel in dashboard['dashboard']['panels']:
             panel['datasource'] = '${}'.format(ds_name)
             _add_enviroment_label(panel, dashboard['dashboard']['title'])
@@ -129,7 +129,7 @@ def _update_panels_datesources(dashboard, ds_name, var_list):
         logging.error('KeyError: {}'.format(e))
 
 
-# Recursive function to generate query with the `remote_env` label
+# Recursive function to generate query with the `p8s_logzio_name` label
 def _generate_query(query_string, env_filter_string):
     if '{' not in query_string:
         return query_string
@@ -138,9 +138,9 @@ def _generate_query(query_string, env_filter_string):
     query_string = query_string[idx:]
     return new_query + _generate_query(query_string, env_filter_string)
 
-# Adding `remote_env` label to all query strings in the dashboard
+# Adding `p8s_logzio_name` label to all query strings in the dashboard
 def _add_enviroment_label(panel, title):
-    env_filter_string = 'remote_env="$remote_env",'
+    env_filter_string = 'p8s_logzio_name="$p8s_logzio_name",'
     try:
         q_idx = 0
         if not panel['type'] == 'row' and not panel['type'] == 'text':
@@ -152,7 +152,7 @@ def _add_enviroment_label(panel, title):
                     q_idx += 1
                 else:
                     ALERTS.append(
-                        'At `{}` dashboard: failed to add `remote_env` to filtering in panel: {}'.format(title, panel[
+                        'At `{}` dashboard: failed to add `p8s_logzio_name` to filtering in panel: {}'.format(title, panel[
                             'title']))
     except KeyError as e:
         logging.error('at _add_enviroment_label: {}'.format(e))
