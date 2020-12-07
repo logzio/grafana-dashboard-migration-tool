@@ -1,4 +1,5 @@
 import logging
+
 logging.basicConfig(format='%(asctime)s - %(levelname)s : %(message)s', level=logging.INFO)
 logging.getLogger().setLevel(logging.INFO)
 print('Installing dependencies 💾')
@@ -116,8 +117,9 @@ def _inspect_panels_types(dashboard):
     panel_types = list(dict.fromkeys(panel_types))
     for t in panel_types:
         if t not in SUPPORTED_PANELS:
-            alert = "⚠️ `{}` dashboard: `{}` panel type is not supported and can cause issues when rendering the dashboard".format(
-                dashboard['dashboard']['title'], t)
+            alert = "⚠️ `{}` panel type is not supported, at `{}` dashboard: you may experience some issues when rendering the " \
+                    "dashboard".format(
+                t, dashboard['dashboard']['title'])
             ALERTS.append(alert)
 
 
@@ -125,7 +127,7 @@ def _update_panels_datesources(dashboard, ds_name, var_list):
     try:
         var_list.append(
             {'name': 'p8s_logzio_name', 'datasource': '$datasource', 'type': 'query', 'query': 'label_values('
-                                                                                          'p8s_logzio_name)'})
+                                                                                               'p8s_logzio_name)'})
         for panel in dashboard['dashboard']['panels']:
             panel['datasource'] = '${}'.format(ds_name)
             _add_enviroment_label(panel, dashboard['dashboard']['title'])
@@ -142,6 +144,7 @@ def _generate_query(query_string, env_filter_string):
     query_string = query_string[idx:]
     return new_query + _generate_query(query_string, env_filter_string)
 
+
 # Adding `p8s_logzio_name` label to all query strings in the dashboard
 def _add_enviroment_label(panel, title):
     env_filter_string = 'p8s_logzio_name="$p8s_logzio_name",'
@@ -156,10 +159,12 @@ def _add_enviroment_label(panel, title):
                     q_idx += 1
                 else:
                     ALERTS.append(
-                        '⚠️ At `{}` dashboard: failed to add `p8s_logzio_name` to filtering in panel: {}'.format(title, panel[
-                            'title']))
+                        '⚠️ Failed to add `p8s_logzio_name` to filtering At `{}` dashboard, in panel: {}'.format(title,
+                                                                                                                 panel[
+                                                                                                                     'title']))
     except KeyError as e:
         logging.error('at _add_enviroment_label: {}'.format(e))
+
 
 # Checking panels for Static datasource reference, will create dynamic datasource variable if not exists
 def _validate_templating(dashboard):
@@ -211,7 +216,7 @@ def main():
             except Exception as e:
                 logging.error("At `{}` dashboard - upload error : {}".format(dashboard['dashboard']['title'], e))
             if upload_response.status_code == 200:
-                logging.info("`{}` dashboard uploaded successfully 🚀, schema version: {}, status code: {}".format(
+                logging.info("🚀  `{}` dashboard uploaded successfully, schema version: {}, status code: {}".format(
                     dashboard['dashboard']['title'], dashboard['dashboard']['schemaVersion'],
                     upload_response.status_code))
             else:
@@ -222,7 +227,7 @@ def main():
                                                                                            'schemaVersion']))
         else:
             ALERTS.append(
-                '⚠️ At `{}` dashboard: cannot parse "rows" object, please consider to update the dashboard schema '
+                '⚠️  cannot parse "rows" object, At `{}` dashboard: please consider to update the dashboard schema '
                 'version ️, current version: {}'.format(dashboard['dashboard']['title'], dashboard[
                     'dashboard']['schemaVersion']))
     for alert in sorted(ALERTS):
