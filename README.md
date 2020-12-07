@@ -34,10 +34,10 @@ python3 main.py # If python 2 is your default version
 | REGION_CODE | Your Logz.io region code. For example if your region is US, then your region code is `us`. You can find your region code here: https://docs.logz.io/user-guide/accounts/account-region.html#regions-and-urls for further information. |
 
 ### Limitations
-* Grfana dashboards with schema version 14 or lower that containes "rows" objects will not be uploaded, you will recive a warning log. Please consider to update your dashboards schema version to the latest.
+* Grfana dashboards with schema version 14 or lower that containes "rows" objects will not be uploaded, you will receive a warning log. Please consider to update your dashboards schema version to the latest.
 
-* The`p8s_logzio_name` variable will not added to panels queries that doesn't contines filtering, you will recive a warning log.
-* Some panel types are not supported by Logz.io platform. If your dahboard containes unsupported panel type you will recive a warning log, and you may have some issues while rendering the panel in logz.io.
+* The`p8s_logzio_name` variable will not added to panels queries that doesn't contines filtering, you will receive a warning log.
+* Some panel types are not supported by Logz.io platform. If your dahboard containes unsupported panel type you will receive a warning log, and you may have some issues while rendering the panel in logz.io.
 
 * Dashboards that include annotations, notification endpoints, and other external resources are imported without these resources during bulk import.
 
