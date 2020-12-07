@@ -1,17 +1,21 @@
-import os
 import logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s : %(message)s', level=logging.INFO)
 logging.getLogger().setLevel(logging.INFO)
-logging.info('Installing dependencies')
-os.system('pip install -r requirements.txt')
+print('Installing dependencies 💾')
 import json
 import requests
 import input_validator
 
-
+print('Configure your environment variables ⚙️')
+print('👇 Your grafana host without protocol specification (e.g. localhost:3000). ')
 GRAFANA_HOST = input('Enter your GRAFANA_HOST:')
+print('👇 Your grafana editor/admin API key, find or create one under Configuration -> API keys.')
 GRAFANA_TOKEN = input('Enter your GRAFANA_TOKEN:')
+print('👇 Your Logz.io account API token, find it under settings -> tools -> manage tokens -> API tokens.')
 LOGZIO_API_TOKEN = input('Enter your LOGZIO_API_TOKEN:')
+print('👇 Your Logz.io region code. For example if your region is US, then your region code is `us`. You can find your '
+      'region code here: https://docs.logz.io/user-guide/accounts/account-region.html#regions-and-urls for further '
+      'information.')
 REGION_CODE = input('Enter your REGION_CODE:')
 
 REQUEST_HEADERS = {
@@ -112,7 +116,7 @@ def _inspect_panels_types(dashboard):
     panel_types = list(dict.fromkeys(panel_types))
     for t in panel_types:
         if t not in SUPPORTED_PANELS:
-            alert = "`{}` dashboard: `{}` panel type is not supported and can cause issues when rendering the dashboard".format(
+            alert = "⚠️ `{}` dashboard: `{}` panel type is not supported and can cause issues when rendering the dashboard".format(
                 dashboard['dashboard']['title'], t)
             ALERTS.append(alert)
 
@@ -152,7 +156,7 @@ def _add_enviroment_label(panel, title):
                     q_idx += 1
                 else:
                     ALERTS.append(
-                        'At `{}` dashboard: failed to add `p8s_logzio_name` to filtering in panel: {}'.format(title, panel[
+                        '⚠️ At `{}` dashboard: failed to add `p8s_logzio_name` to filtering in panel: {}'.format(title, panel[
                             'title']))
     except KeyError as e:
         logging.error('at _add_enviroment_label: {}'.format(e))
@@ -207,7 +211,7 @@ def main():
             except Exception as e:
                 logging.error("At `{}` dashboard - upload error : {}".format(dashboard['dashboard']['title'], e))
             if upload_response.status_code == 200:
-                logging.info("`{}` dashboard uploaded successfully, schema version: {}, status code: {}".format(
+                logging.info("`{}` dashboard uploaded successfully 🚀, schema version: {}, status code: {}".format(
                     dashboard['dashboard']['title'], dashboard['dashboard']['schemaVersion'],
                     upload_response.status_code))
             else:
@@ -218,8 +222,8 @@ def main():
                                                                                            'schemaVersion']))
         else:
             ALERTS.append(
-                'At `{}` dashboard: cannot parse "rows" object, please consider to update the dashboard schema '
-                'version, current version: {}'.format(dashboard['dashboard']['title'], dashboard[
+                '⚠️ At `{}` dashboard: cannot parse "rows" object, please consider to update the dashboard schema '
+                'version ️, current version: {}'.format(dashboard['dashboard']['title'], dashboard[
                     'dashboard']['schemaVersion']))
     for alert in sorted(ALERTS):
         logging.warning(alert)
