@@ -1,12 +1,13 @@
 import os
 import logging
+logging.basicConfig(format='%(asctime)s - %(levelname)s : %(message)s', level=logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
 logging.info('Installing dependencies')
 os.system('pip install -r requirements.txt')
 import json
 import requests
 import input_validator
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s : %(message)s', level=logging.INFO)
 
 GRAFANA_HOST = input('Enter your GRAFANA_HOST:')
 GRAFANA_TOKEN = input('Enter your GRAFANA_TOKEN:')
