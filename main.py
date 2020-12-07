@@ -1,17 +1,17 @@
 import os
-import configuration
+import logging
+logging.info('Installing dependencies')
 os.system('pip install -r requirements.txt')
 import json
 import requests
-import logging
 import input_validator
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s : %(message)s', level=logging.INFO)
 
-GRAFANA_HOST = os.environ['GRAFANA_HOST']
-GRAFANA_TOKEN = os.environ['GRAFANA_TOKEN']
-LOGZIO_API_TOKEN = os.environ['LOGZIO_API_TOKEN']
-REGION_CODE = os.environ['REGION_CODE']
+GRAFANA_HOST = input('Enter your GRAFANA_HOST:')
+GRAFANA_TOKEN = input('Enter your GRAFANA_TOKEN:')
+LOGZIO_API_TOKEN = input('Enter your LOGZIO_API_TOKEN:')
+REGION_CODE = input('Enter your REGION_CODE:')
 
 REQUEST_HEADERS = {
     'Authorization': 'Bearer {}'.format(GRAFANA_TOKEN),

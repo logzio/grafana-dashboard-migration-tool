@@ -16,8 +16,7 @@ git clone https://github.com/logzio/grafana-dashboard-migration-tool.git
 ```bash
 cd grafana-dashboard-migration-tool
 ```
-* Set your enviroment varaiables in `configuration.py`
-* Run the script with your configuration:
+* Run the script, you will be asked to configure your enviroment variables:
 ```bash
 python main.py 
 ```
