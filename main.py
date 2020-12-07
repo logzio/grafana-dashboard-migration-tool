@@ -2,7 +2,6 @@ import logging
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s : %(message)s', level=logging.INFO)
 logging.getLogger().setLevel(logging.INFO)
-print('Installing dependencies 💾')
 import json
 import requests
 import input_validator
