@@ -195,7 +195,8 @@ def main():
     uids = []
     for item in all_dashboards:
         try:
-            uids.append(item['uid'])
+            if item['type'] == 'dash-db':
+                uids.append(item['uid'])
         except TypeError as e:
             raise TypeError(all_dashboards['message'])
     # init list
