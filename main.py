@@ -4,6 +4,9 @@ logging.getLogger().setLevel(logging.INFO)
 import json
 import requests
 import input_validator
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
+from pygments_promql import PromQLLexer
 
 print('Configure your environment variables')
 print('Your grafana host without protocol specification (e.g. localhost:3000). ')
@@ -15,7 +18,7 @@ LOGZIO_API_TOKEN = input('Enter your LOGZIO_API_TOKEN:')
 print('Your Logz.io region code. For example if your region is US, then your region code is `us`. You can find your '
       'region code here: https://docs.logz.io/user-guide/accounts/account-region.html#regions-and-urls for further '
       'information.')
-REGION_CODE = input('Enter your REGION_CODE:')
+REGION_CODE = 'us'  # input('Enter your REGION_CODE:')
 
 REQUEST_HEADERS = {
     'Authorization': 'Bearer {}'.format(GRAFANA_TOKEN),
@@ -138,9 +141,54 @@ def _generate_query(query_string, env_filter_string):
     if '{' not in query_string:
         return query_string
     idx = query_string.index('{') + 1
-    new_query = query_string[:idx] + env_filter_string
-    query_string = query_string[idx:]
-    return new_query + _generate_query(query_string, env_filter_string)
+    return query_string[:idx] + env_filter_string + _generate_query(query_string[idx:], env_filter_string)
+
+
+def _find_grouping(query_string):
+    grouping_indices = []
+    grouping_statements = ['by(', 'on(', ',', 'group_right(', 'group_left(']
+    for statement in grouping_statements:
+        try:
+            indices = [i for i in range(len(query_string)) if query_string.startswith(statement, i)]
+            for idx in indices:
+                grouping_indices.append(idx + len(statement))
+        except ValueError:
+            pass
+    return grouping_indices
+
+
+def _generate_query_without_filtering(query_string, metric_name, env_filter_string):
+    if metric_name == query_string:
+        return query_string + '{' + env_filter_string.replace(',','') + '}'
+    if metric_name not in query_string:
+        return query_string
+    idx = query_string.index(metric_name) + len(metric_name)
+    if query_string[idx] != ':':
+        return query_string[:idx] + '{' + env_filter_string.replace(',', '') + '}' + _generate_query_without_filtering(
+            query_string[idx:], metric_name, env_filter_string)
+    else:
+        return query_string[:idx] + _generate_query_without_filtering(query_string[idx:], metric_name,
+                                                                      env_filter_string)
+
+
+def _find_metrics_names(expr):
+    names = []
+    grouping = []
+    splited_query = highlight(expr, PromQLLexer(), HtmlFormatter()).split('"nv">')
+    for ex in splited_query:
+        ex = ex.split('<', 1)
+        if ex[0]:
+            names.append(ex[0])
+    names = list(dict.fromkeys(names))
+    grouping_indices = _find_grouping(expr)
+    if grouping_indices:
+        for name in names:
+            indices = [i for i in range(len(expr)) if expr.startswith(name, i)]
+            for idx in indices:
+                for g_idx in grouping_indices:
+                    if idx == g_idx:
+                        grouping.append(name)
+    return list(set(names) - set(grouping))
 
 
 # Adding `p8s_logzio_name` label to all query strings in the dashboard
@@ -150,16 +198,17 @@ def _add_enviroment_label(panel, title):
         q_idx = 0
         if not panel['type'] == 'row' and not panel['type'] == 'text':
             for query in panel['targets']:
-                query_string = query['expr']
+                query_string = query['expr'].replace(' ', '')
                 if '{' in query_string:
                     new_query = _generate_query(query_string, env_filter_string)
                     panel['targets'][q_idx]['expr'] = new_query
                     q_idx += 1
                 else:
-                    ALERTS.append(
-                        'Failed to add `p8s_logzio_name` to filtering At `{}` dashboard, in panel: {}'.format(title,
-                                                                                                                 panel[
-                                                                                                                     'title']))
+                    metric_names = _find_metrics_names(query_string)
+                    for name in metric_names:
+                        query_string = _generate_query_without_filtering(query_string, name, env_filter_string)
+                    panel['targets'][q_idx]['expr'] = query_string
+                    q_idx += 1
     except KeyError as e:
         logging.error('at _add_enviroment_label: {}'.format(e))
 
@@ -235,3 +284,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

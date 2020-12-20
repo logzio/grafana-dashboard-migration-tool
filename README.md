@@ -4,9 +4,10 @@ A simple tool to migrate your grafana dashboards to Logz.io platform with minima
 ### Dependencies:
 |  | version |
 |---|---|
-|requests|2.25.0|
-|regex|2020.11.13|
-|Grafana|6 or higher|
+|[requests](https://pypi.org/project/requests/)|2.25.0|
+|[regex](https://pypi.org/project/regex/)|2020.11.13|
+|[pygments-promql](https://pypi.org/project/pygments-promql/)|0.0.5|
+|[Grafana](https://grafana.com/)|6 or higher|
 
 ### How to use:
 * Clone the repo:
@@ -36,8 +37,6 @@ python3 main.py # If python 2 is your default version
 ### Limitations
 * Grfana dashboards with schema version 14 or lower that containes "rows" objects will not be uploaded, you will receive a warning log. Please consider to update your dashboards schema version to the latest.
 
-* The`p8s_logzio_name` variable will not added to panels queries that doesn't contines filtering, you will receive a warning log.
-* Some panel types are not supported by Logz.io platform. If your dahboard containes unsupported panel type you will receive a warning log, and you may have some issues while rendering the panel in logz.io.
 
 * Dashboards that include annotations, notification endpoints, and other external resources are imported without these resources during bulk import.
 
