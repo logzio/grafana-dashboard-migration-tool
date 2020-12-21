@@ -211,7 +211,11 @@ def _add_enviroment_label(panel, title):
                     q_idx += 1
     except KeyError as e:
         logging.error('at _add_enviroment_label: {}'.format(e))
-
+def _update_query_variables(var_list,datasource_name):
+    for var in var_list:
+        if var['type'] == 'query':
+            var['datasource'] = '${}'.format(datasource_name)
+    return var_list
 
 # Checking panels for Static datasource reference, will create dynamic datasource variable if not exists
 def _validate_templating(dashboard):
@@ -230,7 +234,7 @@ def _validate_templating(dashboard):
             }
             datasource_name = new_ds['name']
             var_list.append(new_ds)
-
+        var_list = _update_query_variables(var_list,datasource_name)
         dashboard['dashboard']['templating']['list'] = var_list
         _update_panels_datesources(dashboard, datasource_name, var_list)
     except KeyError as e:
@@ -284,4 +288,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
