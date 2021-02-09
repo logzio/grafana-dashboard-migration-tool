@@ -18,7 +18,7 @@ LOGZIO_API_TOKEN = input('Enter your LOGZIO_API_TOKEN:')
 print('Your Logz.io region code. For example if your region is US, then your region code is `us`. You can find your '
       'region code here: https://docs.logz.io/user-guide/accounts/account-region.html#regions-and-urls for further '
       'information.')
-REGION_CODE = 'us'  # input('Enter your REGION_CODE:')
+REGION_CODE = input('Enter your REGION_CODE:')
 
 REQUEST_HEADERS = {
     'Authorization': 'Bearer {}'.format(GRAFANA_TOKEN),
