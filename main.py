@@ -35,7 +35,6 @@ LOGZIO_API_HEADERS = {
 }
 
 ALERTS = []
-
 SUPPORTED_PANELS = ['graph', 'grafana-worldmap-panel', 'grafana-piechart-panel', 'singlestat', 'dashlist',
                     'alertlist', 'text', 'heatmap', 'bargauge', 'table', 'gauge', 'stat', 'row']
 
@@ -45,9 +44,9 @@ input_validator.is_valid_grafana_api_token(GRAFANA_TOKEN)
 input_validator.is_valid_logzio_api(LOGZIO_API_TOKEN)
 BASE_API_URL = input_validator.is_valid_region_code(REGION_CODE)
 
-BASE_URL = 'http://{}/api'.format(GRAFANA_HOST)
+BASE_URL = 'http://{}/api/'.format(GRAFANA_HOST)
 UPLOAD_DASHBOARD_URL = '{}dashboards/db'.format(BASE_API_URL)
-ALL_DASHBOARDS_URL = '{}/search'.format(BASE_URL)
+ALL_DASHBOARDS_URL = '{}search'.format(BASE_URL)
 
 
 # set dashboard values before upload and creating new dashboard with grafana api
@@ -69,18 +68,19 @@ def _init_parameters(dashboard, fid):
 def _init_dashboard_list(uid_list, base_url, r_headers):
     dashboards_list = []
     for uid in uid_list:
-        request_url = '{}/dashboards/uid/{}'.format(base_url, uid)
+        request_url = f'{base_url}dashboards/uid/{uid}'
         response = requests.get(request_url, headers=r_headers)
         dashboard = response.json()
         try:
             del dashboard['meta']
         except KeyError:
-            logging.error('At {}')
+            pass
         dashboards_list.append(dashboard)
     return dashboards_list
 
 
-# Creates new folder for uploaded dashboards, if the folder already exists, the dashboards in the folder wil be overwriten
+# Creates new folder for uploaded dashboards, if the folder already exists, the dashboards in the folder wil be
+# overwriten
 def _create_uploaded_folder():
     folder_url = '{}folders'.format(BASE_API_URL)
     folder_id = None
@@ -118,10 +118,16 @@ def _inspect_panels_types(dashboard):
     panel_types = list(dict.fromkeys(panel_types))
     for t in panel_types:
         if t not in SUPPORTED_PANELS:
-            alert = "`{}` panel type is not supported, at `{}` dashboard: you may experience some issues when rendering the " \
-                    "dashboard".format(
-                t, dashboard['dashboard']['title'])
+            alert = f"`{t}` panel type is not supported, at `{dashboard['dashboard']['title']}` dashboard: you may " \
+                    f"experience some issues when rendering the dashboard "
             ALERTS.append(alert)
+
+
+def _is_prometheus_panel(targets):
+    for target in targets:
+        if 'expr' not in target.keys():
+            return False
+    return True
 
 
 def _update_panels_datesources(dashboard, ds_name, var_list):
@@ -130,10 +136,22 @@ def _update_panels_datesources(dashboard, ds_name, var_list):
             {'name': 'p8s_logzio_name', 'datasource': '$datasource', 'type': 'query', 'query': 'label_values('
                                                                                                'p8s_logzio_name)'})
         for panel in dashboard['dashboard']['panels']:
-            panel['datasource'] = '${}'.format(ds_name)
-            _add_enviroment_label(panel, dashboard['dashboard']['title'])
+            if 'alert' not in panel.keys():
+                panel['datasource'] = '${}'.format(ds_name)
+                if _is_prometheus_panel(panel['targets']):
+                    _add_enviroment_label(panel)
+            else:
+                panel['datasource'] = None
     except KeyError as e:
-        logging.error('KeyError: {}'.format(e))
+        pass
+
+
+def _clear_notifications(dashboard):
+    for panel in dashboard['dashboard']['panels']:
+        try:
+            panel['alert']['notifications'] = []
+        except KeyError:
+            pass
 
 
 # Recursive function to generate query with the `p8s_logzio_name` label
@@ -159,7 +177,7 @@ def _find_grouping(query_string):
 
 def _generate_query_without_filtering(query_string, metric_name, env_filter_string):
     if metric_name == query_string:
-        return query_string + '{' + env_filter_string.replace(',','') + '}'
+        return query_string + '{' + env_filter_string.replace(',', '') + '}'
     if metric_name not in query_string:
         return query_string
     idx = query_string.index(metric_name) + len(metric_name)
@@ -192,7 +210,7 @@ def _find_metrics_names(expr):
 
 
 # Adding `p8s_logzio_name` label to all query strings in the dashboard
-def _add_enviroment_label(panel, title):
+def _add_enviroment_label(panel):
     env_filter_string = 'p8s_logzio_name="$p8s_logzio_name",'
     try:
         q_idx = 0
@@ -211,11 +229,14 @@ def _add_enviroment_label(panel, title):
                     q_idx += 1
     except KeyError as e:
         logging.error('at _add_enviroment_label: {}'.format(e))
-def _update_query_variables(var_list,datasource_name):
+
+
+def _update_query_variables(var_list, datasource_name):
     for var in var_list:
         if var['type'] == 'query':
             var['datasource'] = '${}'.format(datasource_name)
     return var_list
+
 
 # Checking panels for Static datasource reference, will create dynamic datasource variable if not exists
 def _validate_templating(dashboard):
@@ -234,7 +255,7 @@ def _validate_templating(dashboard):
             }
             datasource_name = new_ds['name']
             var_list.append(new_ds)
-        var_list = _update_query_variables(var_list,datasource_name)
+        var_list = _update_query_variables(var_list, datasource_name)
         dashboard['dashboard']['templating']['list'] = var_list
         _update_panels_datesources(dashboard, datasource_name, var_list)
     except KeyError as e:
@@ -262,12 +283,13 @@ def main():
             _init_parameters(dashboard, folder_id)
             _validate_templating(dashboard)
             _inspect_panels_types(dashboard)
+            _clear_notifications(dashboard)
             try:
                 upload_response = requests.post(url=UPLOAD_DASHBOARD_URL, data=json.dumps(dashboard), params={},
                                                 headers=LOGZIO_API_HEADERS)
             except Exception as e:
                 logging.error("At `{}` dashboard - upload error : {}".format(dashboard['dashboard']['title'], e))
-            if upload_response.status_code == 200:
+            if upload_response.ok:
                 logging.info("`{}` dashboard uploaded successfully, schema version: {}, status code: {}".format(
                     dashboard['dashboard']['title'], dashboard['dashboard']['schemaVersion'],
                     upload_response.status_code))
