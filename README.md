@@ -18,6 +18,11 @@ git clone https://github.com/logzio/grafana-dashboard-migration-tool.git
 ```bash
 cd grafana-dashboard-migration-tool
 ```
+* Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
 * Run the script, you will be asked to configure your enviroment variables:
 ```bash
 python main.py # If python 3 is your default version
