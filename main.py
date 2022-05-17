@@ -1,4 +1,6 @@
 import logging
+import os
+from typing import Dict
 logging.basicConfig(format='%(asctime)s - %(levelname)s : %(message)s', level=logging.INFO)
 logging.getLogger().setLevel(logging.INFO)
 import json
@@ -8,45 +10,17 @@ from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments_promql import PromQLLexer
 
-print('Configure your environment variables')
-print('Your grafana host without protocol specification (e.g. localhost:3000). ')
-GRAFANA_HOST = input('Enter your GRAFANA_HOST:')
-print('Your grafana editor/admin API key, find or create one under Configuration -> API keys.')
-GRAFANA_TOKEN = input('Enter your GRAFANA_TOKEN:')
-print('Your Logz.io account API token, find it under settings -> tools -> manage tokens -> API tokens.')
-LOGZIO_API_TOKEN = input('Enter your LOGZIO_API_TOKEN:')
-print('Your Logz.io region code. For example if your region is US, then your region code is `us`. You can find your '
-      'region code here: https://docs.logz.io/user-guide/accounts/account-region.html#regions-and-urls for further '
-      'information.')
-REGION_CODE = input('Enter your REGION_CODE:')
-
-REQUEST_HEADERS = {
-    'Authorization': 'Bearer {}'.format(GRAFANA_TOKEN),
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache',
-    'User-Agent': None
-}
-
-LOGZIO_API_HEADERS = {
-    'X-API-TOKEN': LOGZIO_API_TOKEN,
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache',
-    'User-Agent': None
-}
-
 ALERTS = []
 SUPPORTED_PANELS = ['graph', 'grafana-worldmap-panel', 'grafana-piechart-panel', 'singlestat', 'dashlist',
-                    'alertlist', 'text', 'heatmap', 'bargauge', 'table', 'gauge', 'stat', 'row']
+                        'alertlist', 'text', 'heatmap', 'bargauge', 'table', 'gauge', 'stat', 'row']
 
-# validate inputs
-input_validator.is_valid_grafana_host(GRAFANA_HOST)
-input_validator.is_valid_grafana_api_token(GRAFANA_TOKEN)
-input_validator.is_valid_logzio_api(LOGZIO_API_TOKEN)
-BASE_API_URL = input_validator.is_valid_region_code(REGION_CODE)
-
-BASE_URL = 'http://{}/api/'.format(GRAFANA_HOST)
-UPLOAD_DASHBOARD_URL = '{}dashboards/db'.format(BASE_API_URL)
-ALL_DASHBOARDS_URL = '{}search'.format(BASE_URL)
+# read variable either from environment or, if not found, from input.
+def _read_variable(name: str) -> str:
+    if name in os.environ:
+        val = os.environ[name]
+        print("Took from environment {}".format(val))
+        return val
+    return input("Enter your {}:".format(name))
 
 
 # set dashboard values before upload and creating new dashboard with grafana api
@@ -81,11 +55,11 @@ def _init_dashboard_list(uid_list, base_url, r_headers):
 
 # Creates new folder for uploaded dashboards, if the folder already exists, the dashboards in the folder wil be
 # overwriten
-def _create_uploaded_folder():
-    folder_url = '{}folders'.format(BASE_API_URL)
+def _create_uploaded_folder(logzio_url: str, logz_api_headers: Dict[str, str]):
+    folder_url = '{}folders'.format(logzio_url)
     folder_id = None
     new_title = 'Uploaded by script'
-    folders_list = json.loads(requests.get(folder_url, params={}, headers=LOGZIO_API_HEADERS).text)
+    folders_list = json.loads(requests.get(folder_url, params={}, headers=logz_api_headers).text)
     for folder in folders_list:
         if folder['title'] == new_title:
             folder_id = folder['id']
@@ -95,7 +69,7 @@ def _create_uploaded_folder():
             "uid": None,
             "title": new_title
         }
-        new_folder = requests.post(url=folder_url, json=folder_data, params={}, headers=LOGZIO_API_HEADERS).json()
+        new_folder = requests.post(url=folder_url, json=folder_data, params={}, headers=logz_api_headers).json()
         folder_id = new_folder['id']
         logging.info('New folder created with id: {}'.format(str(folder_id)))
 
@@ -265,6 +239,45 @@ def _validate_templating(dashboard):
 
 # main script
 def main():
+    print('Configure your environment variables')
+    print('Your grafana host without protocol specification (e.g. localhost:3000). ')
+    GRAFANA_HOST = _read_variable('GRAFANA_HOST')
+    print('Your grafana editor/admin API key, find or create one under Configuration -> API keys.')
+    GRAFANA_TOKEN = _read_variable('GRAFANA_TOKEN')
+    print('Your Logz.io account API token, find it under settings -> tools -> manage tokens -> API tokens.')
+    LOGZIO_API_TOKEN = _read_variable('LOGZIO_API_TOKEN')
+    print('Your Logz.io region code. For example if your region is US, then your region code is `us`. You can find your '
+        'region code here: https://docs.logz.io/user-guide/accounts/account-region.html#regions-and-urls for further '
+        'information.')
+    REGION_CODE = _read_variable('REGION_CODE')
+
+    REQUEST_HEADERS = {
+        'Authorization': 'Bearer {}'.format(GRAFANA_TOKEN),
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'User-Agent': None
+    }
+
+    LOGZIO_API_HEADERS = {
+        'X-API-TOKEN': LOGZIO_API_TOKEN,
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'User-Agent': None
+    }
+
+
+    # validate inputs
+    input_validator.is_valid_grafana_host(GRAFANA_HOST)
+    input_validator.is_valid_grafana_api_token(GRAFANA_TOKEN)
+    input_validator.is_valid_logzio_api(LOGZIO_API_TOKEN)
+    BASE_API_URL = input_validator.is_valid_region_code(REGION_CODE)
+
+    PROTO =  os.environ['GRAFANA_PROTO'] if 'GRAFANA_PROTO' in os.environ else 'https' 
+    BASE_URL = '{}://{}/api/'.format(PROTO, GRAFANA_HOST)
+    UPLOAD_DASHBOARD_URL = '{}dashboards/db'.format(BASE_API_URL)
+    ALL_DASHBOARDS_URL = '{}search'.format(BASE_URL)
+
+
     all_dashboards = requests.get(ALL_DASHBOARDS_URL, headers=REQUEST_HEADERS).json()
     uids = []
     for item in all_dashboards:
@@ -279,6 +292,7 @@ def main():
     folder_id = _create_uploaded_folder()
 
     for dashboard in dashboards_list:
+        logging.info(f"Processing dashboard {dashboard['dashboard']['title']}")
         if "rows" not in dashboard['dashboard'].keys() or dashboard['dashboard']['schemaVersion'] > 14:
             _init_parameters(dashboard, folder_id)
             _validate_templating(dashboard)
