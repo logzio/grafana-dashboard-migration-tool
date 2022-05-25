@@ -59,8 +59,10 @@ def _create_uploaded_folder(logzio_url: str, logz_api_headers: Dict[str, str]):
     folder_url = '{}folders'.format(logzio_url)
     folder_id = None
     new_title = 'Uploaded by script'
-    folders_list = json.loads(requests.get(folder_url, params={}, headers=logz_api_headers).text)
-    for folder in folders_list:
+    resp = requests.get(folder_url, params={}, headers=logz_api_headers)
+    resp.raise_for_status()
+    
+    for folder in resp.json():
         if folder['title'] == new_title:
             folder_id = folder['id']
             logging.info('Found existing `Uploaded by script` folder with id: {}'.format(str(folder_id)))
