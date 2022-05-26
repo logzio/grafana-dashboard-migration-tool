@@ -43,3 +43,6 @@ poetry run python main.py
 - Dashboards that include annotations, notification endpoints, and other external resources are imported without these resources during bulk import.
 
 - Custom selection of dashboards is not possible with bulk import. All your dashboard folders are imported to a single folder within Logz.io.
+
+### Contributors
+* Romain Guilmont [@rguilmont](https://github.com/rguilmont)
