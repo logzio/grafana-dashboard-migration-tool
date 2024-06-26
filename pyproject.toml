@@ -9,7 +9,7 @@ python = "^3.8"
 requests = "2.25.0"
 regex = "2020.11.13"
 pygments-promql = "0.0.9"
-prometheus-client = "^0.14.1"
+prometheus-client = "^0.20.0"
 coloredlogs = "^15.0.1"
 colorama = "^0.4.4"
 
