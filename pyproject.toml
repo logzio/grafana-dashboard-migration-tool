@@ -14,7 +14,7 @@ coloredlogs = "^15.0.1"
 colorama = "^0.4.4"
 
 [tool.poetry.dev-dependencies]
-ipython = "^8.3.0"
+ipython = "^8.10.0"
 pytest = "^7.1.2"
 
 [build-system]
